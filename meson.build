@@ -3,7 +3,7 @@ project('maya', 'cpp')
 maya_version = get_option('maya_version')
 maya_devkit_base = get_option('maya_devkit_base')
 maya_link_qt = get_option('maya_link_qt')
-fs = import('fs')
+maya_qt_extra_includes = get_option('maya_qt_extra_includes')
 
 os_name = build_machine.system()
 
@@ -61,6 +61,7 @@ maya_inc = include_directories(maya_inc_dir)
 maya_lib_dir = maya_install_path / maya_lib_suffix
 message('Searching Maya lib directory:', maya_lib_dir)
 
+# Get all the maya libraries
 cmplr = meson.get_compiler('cpp')
 maya_libs = [
   cmplr.find_library('Foundation', dirs : maya_lib_dir),
@@ -72,7 +73,10 @@ maya_libs = [
   cmplr.find_library('clew', dirs : maya_lib_dir),
 ]
 
+# Link to maya's qt libs if required
+# This doesn't do MOC stuff ... yet
 if maya_link_qt
+  fs = import('fs')
   if not fs.is_dir(maya_inc_dir / 'QtCore')
     error(
       'Could not find Maya QT headers with `maya_link_qt` defined\n',
@@ -82,30 +86,13 @@ if maya_link_qt
   endif
 
   maya_qt_lib_names = ['Qt5Core', 'Qt5Gui', 'Qt5Widgets']
-
-  maya_qt_extra_lib_names = [
-    'Qt53DAnimation', 'Qt5Qml', 'Qt5Test', 'Qt53DCore', 'Qt5DBus',
-    'Qt5QmlModels', 'Qt5TextToSpeech', 'Qt53DExtras', 'Qt5Gamepad', 'Qt5QmlWorkerScript',
-    'Qt5ThemeSupport', 'Qt53DInput', 'Qt5Quick', 'Qt5UiTools', 'Qt53DLogic',
-    'Qt5Help', 'Qt5QuickControls2', 'Qt5WebChannel', 'Qt53DQuick', 'Qt5QuickParticles',
-    'Qt5WebEngine', 'Qt53DQuickAnimation', 'Qt5Multimedia', 'Qt5QuickShapes',
-    'Qt5WebEngineCore', 'Qt53DQuickExtras', 'Qt5MultimediaQuick', 'Qt5QuickTemplates2',
-    'Qt5WebEngineWidgets', 'Qt53DQuickInput', 'Qt5MultimediaWidgets', 'Qt5QuickTest',
-    'Qt5WebSockets', 'Qt53DQuickRender', 'Qt5Network', 'Qt5QuickWidgets', 'Qt5WebView',
-    'Qt53DQuickScene2D', 'Qt5Nfc', 'Qt5RemoteObjects', 'Qt53DRender', 'Qt5OpenGL',
-    'Qt5Scxml', 'Qt5WinExtras', 'Qt5AxBase', 'Qt5OpenGLExtensions', 'Qt5Sensors',
-    'Qt5WindowsUIAutomationSupport', 'Qt5AxContainer', 'Qt5Pdf', 'Qt5SerialBus',
-    'Qt5Xml', 'Qt5AxServer', 'Qt5Positioning', 'Qt5SerialPort', 'Qt5XmlPatterns',
-    'Qt5Bluetooth', 'Qt5PositioningQuick', 'Qt5Sql', 'Qt5Concurrent', 'Qt5PrintSupport',
-    'Qt5Svg',
-  ]
-
-  # Bad headers 'Qt5Location'
+  if maya_qt_extra_includes != ''
+    maya_qt_lib_names += maya_qt_extra_includes.split(';')
+  endif
 
   foreach lib_name : maya_qt_lib_names
       maya_libs += cmplr.find_library(lib_name, dirs : maya_lib_dir)
   endforeach
-
 endif
 
 maya_dep = declare_dependency(
@@ -118,4 +105,3 @@ maya_dep = declare_dependency(
 )
 
 meson.override_dependency('maya', maya_dep)
-

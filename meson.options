@@ -20,3 +20,11 @@ option(
   value: false,
   yield : true,
 )
+
+option(
+  'maya_qt_extra_includes',
+  type : 'string',
+  description : 'Any qt headers other than QtCore, QtGui, or QtWidgets that you need to include, separated by semicolons',
+  value: '',
+  yield : true,
+)
