@@ -16,7 +16,7 @@ maya_link_args = []
 if os_name == 'windows'
   maya_install_base = 'c:/Program Files/Autodesk'
   maya_plugin_ext = 'mll'
-  maya_compile_args += ['-DNT_PLUGIN']
+  maya_compile_args += ['-DNT_PLUGIN', '/Zc:__cplusplus']
   maya_link_args = ['/export:initializePlugin', '/export:uninitializePlugin']
 elif os_name == 'darwin'
   maya_install_base = '/Applications/Autodesk'
@@ -54,12 +54,15 @@ if maya_devkit_base != ''
   maya_install_path = maya_devkit_base
 endif
 
+includes = []
 maya_inc_dir = maya_install_path / maya_inc_suffix
 message('Searching Maya Include directory:', maya_inc_dir)
-maya_inc = include_directories(maya_inc_dir)
+includes += include_directories(maya_inc_dir)
 
 maya_lib_dir = maya_install_path / maya_lib_suffix
 message('Searching Maya lib directory:', maya_lib_dir)
+
+maya_bin_dir = maya_install_path / 'bin'
 
 # Get all the maya libraries
 cmplr = meson.get_compiler('cpp')
@@ -74,7 +77,8 @@ maya_libs = [
 ]
 
 # Link to maya's qt libs if required
-# This doesn't do MOC stuff ... yet
+# Below, I expose the bin and include dirs so I can directly invoke the
+# moc exe included with maya. Saves from having to make a maya qt module
 if maya_link_qt
   fs = import('fs')
   if not fs.is_dir(maya_inc_dir / 'QtCore')
@@ -83,25 +87,39 @@ if maya_link_qt
       'You probably need to unzip `include/qt_*-include.zip`\n',
       'Checking in folder: ', maya_inc_dir,
     )
+  qt_ver = 5
+  if maya_version.version_compare('>=2025')
+    qt_ver = 6
+  endif
+  maya_qt_lib_names = [f'Qt@qt_ver@Core', f'Qt@qt_ver@Gui', f'Qt@qt_ver@Widgets']
+
+  qt_lib_dir = maya_lib_dir
+  if maya_devkit_base != ''
+    qt_lib_dir = maya_devkit_base / 'Qt' / 'lib'
+    qt_inc_dir = maya_devkit_base / 'Qt' / 'include'
+    includes += include_directories(qt_inc_dir)
   endif
 
-  maya_qt_lib_names = ['Qt5Core', 'Qt5Gui', 'Qt5Widgets']
   if maya_qt_extra_includes != ''
     maya_qt_lib_names += maya_qt_extra_includes.split(';')
   endif
 
   foreach lib_name : maya_qt_lib_names
-      maya_libs += cmplr.find_library(lib_name, dirs : maya_lib_dir)
+      maya_libs += cmplr.find_library(lib_name, dirs : qt_lib_dir)
   endforeach
 endif
 
 maya_dep = declare_dependency(
   dependencies : maya_libs,
-  include_directories : maya_inc,
-  variables : {'name_suffix' : maya_plugin_ext, 'maya_version' : maya_version},
+  include_directories : includes,
+  variables : {
+    'name_suffix' : maya_plugin_ext,
+    'maya_version' : maya_version,
+    'maya_bin_dir': maya_bin_dir,
+    'maya_inc_dir': maya_inc_dir,
+  },
   compile_args : maya_compile_args,
   link_args : maya_link_args,
-
 )
 
 meson.override_dependency('maya', maya_dep)
