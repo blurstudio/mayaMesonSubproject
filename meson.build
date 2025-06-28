@@ -87,6 +87,7 @@ if maya_link_qt
       'You probably need to unzip `include/qt_*-include.zip`\n',
       'Checking in folder: ', maya_inc_dir,
     )
+  endif
   qt_ver = 5
   if maya_version.version_compare('>=2025')
     qt_ver = 6
