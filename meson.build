@@ -79,35 +79,49 @@ maya_libs = [
 # Link to maya's qt libs if required
 # Below, I expose the bin and include dirs so I can directly invoke the
 # moc exe included with maya. Saves from having to make a maya qt module
+
+qt_moc_path = maya_bin_dir / 'moc'
 if maya_link_qt
   fs = import('fs')
-  if not fs.is_dir(maya_inc_dir / 'QtCore')
-    error(
-      'Could not find Maya QT headers with `maya_link_qt` defined\n',
-      'You probably need to unzip `include/qt_*-include.zip`\n',
-      'Checking in folder: ', maya_inc_dir,
-    )
-  endif
-  qt_ver = 5
   if maya_version.version_compare('>=2025')
-    qt_ver = 6
-  endif
-  maya_qt_lib_names = [f'Qt@qt_ver@Core', f'Qt@qt_ver@Gui', f'Qt@qt_ver@Widgets']
+    if not fs.is_dir(maya_install_path / 'Qt' / 'include' / 'QtCore')
+      error(
+        'Could not find Maya QT headers with `maya_link_qt` defined\n',
+        'You probably need to unzip `devkitBase/Qt.zip`\n',
+        'Checking in folder: ', maya_install_path,
+      )
+    endif
+    maya_qt_lib_names = [f'Qt6Core', f'Qt6Gui', f'Qt6Widgets']
 
-  qt_lib_dir = maya_lib_dir
-  if maya_devkit_base != ''
-    qt_lib_dir = maya_devkit_base / 'Qt' / 'lib'
-    qt_inc_dir = maya_devkit_base / 'Qt' / 'include'
-    includes += include_directories(qt_inc_dir)
+    qt_lib_dir = maya_lib_dir
+    if maya_devkit_base != ''
+      qt_lib_dir = maya_devkit_base / 'Qt' / 'lib'
+      qt_moc_path = maya_devkit_base / 'Qt' / 'libexec' / 'moc'
+      includes += include_directories(maya_devkit_base / 'Qt' / 'include')
+    endif
+  else
+    if not fs.is_dir(maya_inc_dir / 'QtCore')
+      error(
+        'Could not find Maya QT headers with `maya_link_qt` defined\n',
+        'You probably need to unzip `include/qt_*-include.zip`\n',
+        'Checking in folder: ', maya_inc_dir,
+      )
+    endif
+    qt_ver = 5
+    maya_qt_lib_names = [f'Qt5Core', f'Qt5Gui', f'Qt5Widgets']
+    qt_lib_dir = maya_lib_dir
+    if maya_devkit_base != ''
+      qt_moc_path = maya_devkit_base / 'devkit' / 'bin' / 'moc'
+    endif
   endif
 
   if maya_qt_extra_includes != ''
     maya_qt_lib_names += maya_qt_extra_includes.split(';')
   endif
-
   foreach lib_name : maya_qt_lib_names
       maya_libs += cmplr.find_library(lib_name, dirs : qt_lib_dir)
   endforeach
+
 endif
 
 maya_dep = declare_dependency(
@@ -118,6 +132,7 @@ maya_dep = declare_dependency(
     'maya_version' : maya_version,
     'maya_bin_dir': maya_bin_dir,
     'maya_inc_dir': maya_inc_dir,
+    'qt_moc_path': qt_moc_path,
   },
   compile_args : maya_compile_args,
   link_args : maya_link_args,
