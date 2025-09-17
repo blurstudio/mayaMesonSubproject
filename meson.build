@@ -3,6 +3,7 @@ project('maya', 'cpp')
 maya_version = get_option('maya_version')
 maya_devkit_base = get_option('maya_devkit_base')
 maya_link_qt = get_option('maya_link_qt')
+maya_link_opengl = get_option('maya_link_opengl')
 maya_qt_extra_includes = get_option('maya_qt_extra_includes')
 
 os_name = build_machine.system()
@@ -139,6 +140,18 @@ if maya_link_qt
   endforeach
 
 endif
+
+if maya_link_opengl
+  gl_dep = dependency('gl', method : 'system')
+  if build_machine.system() == 'windows'
+    cmplr = meson.get_compiler('cpp')
+    glu_dep = cmplr.find_library('glu32', required : true)
+  else
+    glu_dep = dependency('glu')
+  endif
+  maya_libs += [gl_dep, glu_dep]
+endif
+
 
 maya_dep = declare_dependency(
   dependencies : maya_libs,
