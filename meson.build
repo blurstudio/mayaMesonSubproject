@@ -95,8 +95,10 @@ if maya_link_qt
   search_paths = [
     maya_inc_dir,
     maya_inc_dir / 'Qt',
+    maya_inc_dir / 'Qt' / 'include',
     maya_install_path,
     maya_install_path / 'Qt',
+    maya_install_path / 'Qt' / 'include',
   ]
   qt_include_dir = ''
   foreach search_path: search_paths
@@ -121,6 +123,7 @@ if maya_link_qt
     maya_bin_dir,
     maya_install_path / 'Qt' / 'bin',
     maya_install_path / 'Qt' / 'libexec',
+    maya_install_path / 'devkit' / 'bin',
   ]
   moc_prg = find_program('moc', dirs : mocdirs, required : true)
   qt_moc_path = moc_prg.full_path()
