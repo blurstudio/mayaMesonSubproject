@@ -91,52 +91,57 @@ qt_moc_path = ''
 if maya_link_qt
   fs = import('fs')
 
-  if maya_version.version_compare('>=2025')
-    if not fs.is_dir(maya_install_path / 'Qt' / 'include' / 'QtCore')
-      error(
-        'Could not find Maya QT headers with `maya_link_qt` defined\n',
-        'You probably need to unzip `devkitBase/Qt.zip`\n',
-        'Checking in folder: ', maya_install_path,
-      )
+  # Search common places for the qt include dirs
+  search_paths = [
+    maya_inc_dir,
+    maya_inc_dir / 'Qt',
+    maya_install_path,
+    maya_install_path / 'Qt',
+  ]
+  qt_include_dir = ''
+  foreach search_path: search_paths
+    if fs.is_dir(search_path / 'QtCore')
+      qt_include_dir = search_path
+      break
     endif
-    maya_qt_lib_names = [f'Qt6Core', f'Qt6Gui', f'Qt6Widgets']
+  endforeach
 
-    qt_lib_dir = maya_lib_dir
-    qt_moc_path = maya_bin_dir / 'moc'
-    if maya_devkit_base != ''
-      qt_lib_dir = maya_devkit_base / 'Qt' / 'lib'
-
-      mocdirs = [
-        maya_devkit_base / 'Qt' / 'bin',
-        maya_devkit_base / 'Qt' / 'libexec',
-      ]
-      moc_prg = find_program('moc', dirs : mocdirs, required : true)
-      qt_moc_path = moc_prg.full_path()
-
-      includes += include_directories(maya_devkit_base / 'Qt' / 'include')
-    endif
-  else
-    if not fs.is_dir(maya_inc_dir / 'QtCore')
-      error(
-        'Could not find Maya QT headers with `maya_link_qt` defined\n',
-        'You probably need to unzip `include/qt_*-include.zip`\n',
-        'Checking in folder: ', maya_inc_dir,
-      )
-    endif
-    qt_ver = 5
-    maya_qt_lib_names = [f'Qt5Core', f'Qt5Gui', f'Qt5Widgets']
-    qt_lib_dir = maya_lib_dir
-    qt_moc_path = maya_bin_dir / 'moc'
-    if maya_devkit_base != ''
-      qt_moc_path = maya_devkit_base / 'devkit' / 'bin' / 'moc'
-    endif
+  if qt_include_dir == ''
+    error(
+      'Could not find Maya QT headers with `maya_link_qt` defined\n',
+      'You probably need to unzip file:\n',
+      'Check for `devkitBase/Qt.zip` or `include/qt_*-include.zip`\n',
+      'Checking in folder: ', maya_install_path,
+    )
   endif
+
+  includes += include_directories(qt_include_dir)
+
+  mocdirs = [
+    maya_bin_dir,
+    maya_install_path / 'Qt' / 'bin',
+    maya_install_path / 'Qt' / 'libexec',
+  ]
+  moc_prg = find_program('moc', dirs : mocdirs, required : true)
+  qt_moc_path = moc_prg.full_path()
+
+  if maya_version.version_compare('>=2025')
+    maya_qt_lib_names = [f'Qt6Core', f'Qt6Gui', f'Qt6Widgets']
+  else
+    maya_qt_lib_names = [f'Qt5Core', f'Qt5Gui', f'Qt5Widgets']
+  endif
+
+  libpaths = [
+    maya_lib_dir,
+    maya_install_path / 'Qt' / 'lib'
+  ]
 
   if maya_qt_extra_includes != ''
     maya_qt_lib_names += maya_qt_extra_includes.split(';')
   endif
+
   foreach lib_name : maya_qt_lib_names
-      maya_libs += cmplr.find_library(lib_name, dirs : qt_lib_dir)
+    maya_libs += cmplr.find_library(lib_name, dirs : libpaths)
   endforeach
 
 endif
