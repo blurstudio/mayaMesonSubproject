@@ -1,6 +1,6 @@
 [wrap-git]
 url = https://github.com/blurstudio/mayaMesonSubproject.git
-revision = main
+revision = v2
 depth = 1
 
 [provide]
