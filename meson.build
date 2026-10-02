@@ -129,6 +129,12 @@ foreach lib_name : core_lib_names
   core_libs += cmplr.find_library(lib_name, dirs : search_lib_dirs)
 endforeach
 
+maya_platform = {
+    'windows': 'win64',
+    'darwin': 'mac',
+    'linux': 'linux',
+}.get(os_name)
+
 # ==============================================================================
 # DEPENDENCY 1: Core Maya (For Python Modules / Standalone Apps)
 # ==============================================================================
@@ -141,6 +147,7 @@ maya_core_dep = declare_dependency(
     'maya_inc_dir': maya_inc_dir,
     'maya_install_path': maya_install_path,
     'maya_using_devkit': has_devkit.to_string(),
+    'maya_platform': maya_platform,
   }
 )
 meson.override_dependency('maya-core', maya_core_dep)
@@ -155,6 +162,7 @@ maya_plugin_dep = declare_dependency(
   variables : {
     'name_suffix' : maya_plugin_ext,
     'maya_version' : maya_version,
+    'maya_platform': maya_platform,
   }
 )
 meson.override_dependency('maya', maya_plugin_dep)
