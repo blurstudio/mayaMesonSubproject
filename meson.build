@@ -154,6 +154,7 @@ maya_plugin_dep = declare_dependency(
   link_args : maya_link_args,
   variables : {
     'name_suffix' : maya_plugin_ext,
+    'maya_version' : maya_version,
   }
 )
 meson.override_dependency('maya', maya_plugin_dep)
