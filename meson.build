@@ -316,7 +316,14 @@ endif
 if not gl_opt.disabled()
   gl_dep = dependency('gl', method : 'system', required: gl_opt.enabled())
   if gl_dep.found()
-    glu_dep = os_name == 'windows' ? cmplr.find_library('glu32', required : gl_opt.enabled()) : dependency('glu', required: gl_opt.enabled())
+    if os_name == 'windows'
+      glu_dep = cmplr.find_library('glu32', required : gl_opt.enabled())
+    elif os_name == 'darwin'
+      # On macOS, GLU is part of the OpenGL framework
+      glu_dep = dependency('appleframeworks', modules : ['OpenGL'], required : gl_opt.enabled())
+    else
+      glu_dep = dependency('glu', required: gl_opt.enabled())
+    endif
     if glu_dep.found()
       maya_opengl_dep = declare_dependency(dependencies: [gl_dep, glu_dep])
       meson.override_dependency('maya-opengl', maya_opengl_dep)
