@@ -8,20 +8,33 @@ cmplr = meson.get_compiler('cpp')
 find_zip_script = '''
 import sys, glob, os
 base = sys.argv[1]
-pattern = sys.argv[2]
+patterns = sys.argv[2].split(';')
 
 bases = [b for b in base.split(';') if os.path.exists(b)]
-if not bases:
-    print(f"a zip file matching '{pattern}'")
-    sys.exit(0)
-
 for base in bases:
-    matches = glob.glob(os.path.join(base, "**", pattern), recursive=True)
-    if matches:
-        print(matches[0])
-        sys.exit(0)
+    for pattern in patterns:
+        matches = glob.glob(os.path.join(base, "**", pattern), recursive=True)
+        if matches:
+            print(matches[0])
+            sys.exit(0)
+'''
 
-print(f"a zip file matching '{pattern}'")
+extract_script = '''
+import sys, os, zipfile, tarfile
+archive = sys.argv[1]
+dest = os.path.dirname(archive)
+try:
+    if archive.endswith('.zip'):
+        with zipfile.ZipFile(archive, 'r') as z:
+            z.extractall(dest)
+    else:
+        with tarfile.open(archive, 'r:gz') as t:
+            t.extractall(dest)
+    print("SUCCESS")
+except PermissionError:
+    print("PERMISSION_DENIED")
+except Exception as e:
+    print(f"ERROR: {e}")
 '''
 
 maya_version = get_option('maya_version')
@@ -271,8 +284,9 @@ endif
 if not qt_opt.disabled()
   search_paths = [
     maya_inc_dir, maya_inc_dir / 'Qt', maya_inc_dir / 'Qt' / 'include',
-    maya_install_path, maya_install_path / 'Qt', maya_install_path / 'Qt' / 'include',
+    search_base, search_base / 'Qt', search_base / 'Qt' / 'include',
   ]
+
   qt_include_dir = ''
   foreach search_path: search_paths
     if fs.is_dir(search_path / 'QtCore')
@@ -281,9 +295,44 @@ if not qt_opt.disabled()
     endif
   endforeach
 
+  # Automatically unzip if not found
+  if qt_include_dir == ''
+    qt_patterns = os_name == 'windows' ? 'Qt.zip;qt_*include.zip' : 'Qt.tgz;qt_*include*.tar.gz'
+    search_bases = has_devkit ? maya_devkit_base + ';' + maya_install_path : maya_install_path
+
+    zip_path = run_command(py, '-c', find_zip_script, search_bases, qt_patterns, check: false).stdout().strip()
+
+    if zip_path != ''
+      message('Found Qt archive, attempting to extract: ' + zip_path)
+      extract_res = run_command(py, '-c', extract_script, zip_path, check: false).stdout().strip()
+
+      if extract_res == 'PERMISSION_DENIED'
+        dest_dir = fs.parent(zip_path)
+        if os_name == 'windows'
+          cmd = 'powershell -Command "Expand-Archive -Path \'' + zip_path + '\' -DestinationPath \'' + dest_dir + '\' -Force"'
+          error('Permission denied extracting Qt headers. Run your terminal as Administrator and re-run meson, or manually extract using:\n' + cmd)
+        else
+          # Both Linux and macOS use tar xvzf for .tgz and .tar.gz files
+          cmd = 'sudo tar xvzf "' + zip_path + '" -C "' + dest_dir + '"'
+          error('Permission denied extracting Qt headers. Please extract it manually by running:\n' + cmd)
+        endif
+      elif extract_res != 'SUCCESS'
+        error('Failed to extract Qt headers: ' + extract_res)
+      endif
+
+      # Extraction successful, re-evaluate search paths
+      foreach search_path: search_paths
+        if fs.is_dir(search_path / 'QtCore')
+          qt_include_dir = search_path
+          break
+        endif
+      endforeach
+    endif
+  endif
+
   if qt_include_dir != ''
     mocdirs = maya_bin_dir != '' ? [maya_bin_dir] : []
-    mocdirs += [maya_install_path / 'Qt' / 'bin', maya_install_path / 'Qt' / 'libexec', maya_install_path / 'devkit' / 'bin']
+    mocdirs += [search_base / 'Qt' / 'bin', search_base / 'Qt' / 'libexec', search_base / 'devkit' / 'bin']
     moc_prg = find_program('moc', dirs : mocdirs, required : qt_opt.enabled())
 
     if moc_prg.found()
@@ -293,9 +342,10 @@ if not qt_opt.disabled()
         maya_qt_lib_names += maya_qt_extra_includes.split(';')
       endif
 
+      qt_lib_dirs = search_lib_dirs + search_base / 'Qt' / 'lib'
       qt_libs = []
       foreach lib_name : maya_qt_lib_names
-        qt_libs += cmplr.find_library(lib_name, dirs : search_lib_dirs)
+        qt_libs += cmplr.find_library(lib_name, dirs : qt_lib_dirs)
       endforeach
 
       maya_qt_dep = declare_dependency(
@@ -306,9 +356,7 @@ if not qt_opt.disabled()
       build_qt = true
     endif
   elif qt_opt.enabled()
-    baselist = ';'.join(search_paths)
-    zip_hint = run_command(py, '-c', find_zip_script, baselist, 'qt_*include.zip', check: false).stdout().strip()
-    error('Could not find Maya QT headers. Unzip: ' + zip_hint)
+    error('Could not find or automatically extract Maya QT headers.')
   endif
 endif
 
